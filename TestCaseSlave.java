@@ -19,7 +19,7 @@ public class TestCaseSlave{
    public void go(){
       try{
          Socket s = new Socket();//new Socket("127.0.0.1",9000);
-         InetSocketAddress isa = new InetSocketAddress("127.0.0.1", 9000);
+         InetSocketAddress isa = new InetSocketAddress("127.0.0.1", 9001);
          s.connect(isa, 10000);
          RecvThread recv = new RecvThread(s);
          new Thread(recv).start();
@@ -29,7 +29,8 @@ public class TestCaseSlave{
       }catch(UnknownHostException e){
          e.printStackTrace();
       }catch(IOException e){
-         e.printStackTrace();
+         System.out.println("maybe master server is not initialized");
+         //e.printStackTrace();
       }
    }
 
@@ -54,18 +55,19 @@ public class TestCaseSlave{
          char[] buf = new char[5000];
          while(true){
             try{
-               System.out.println(buf[nread]);
+               //System.out.println(buf[nread]);
                if((r = bf.read(buf, nread, 1))<=0) break;
                //System.out.println(buf[nread]);
                if(buf[nread++] == '\0') break;    
                
                //str = dis.readUTF();
                //if("bye".equals(str))break;
-               System.out.println("received message:"+str.toString());
+               //System.out.println("received message:"+str.toString());
             }catch(IOException e){
                e.printStackTrace();
             }
          }
+         System.out.println("received message: "+new String(buf));
       }
    }
    class SendThread implements Runnable{

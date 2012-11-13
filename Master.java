@@ -5,8 +5,8 @@ import java.util.concurrent.*;
 
 public class Master{
    private int socketNum = 0;
-   public Master() throws Exception{
-   }
+
+   public Master() throws Exception{}
 
    public static void main(String [] args){
       ExecutorService es = Executors.newFixedThreadPool(3);
@@ -55,7 +55,7 @@ class WebInvoker implements Runnable{
     * run method will implements handling information
     */ 
    public void run(){
-      System.out.println("get client information...");
+      System.out.println("master start to run...");
       
       /* initialize ssrvManager */
       SlaveInvoker ssrvManager = new SlaveInvoker();
@@ -75,6 +75,10 @@ class WebInvoker implements Runnable{
 
             /* transfer the data to SlaveInvoker */
             ssrvManager.renewRequest(new Request(req));
+
+            /* this line is used to dispatch the request*/
+            //ssrvManager.requestDispatched();
+
          }catch(IOException ioe){
             ioe.printStackTrace();
          }
@@ -90,21 +94,14 @@ class WebInvoker implements Runnable{
       try{
          BufferedReader bf = new BufferedReader(new InputStreamReader(s.getInputStream()));
          while(true){
-            System.out.println(buf[nread]);
             if((r = bf.read(buf, nread, 1))<=0) return null;
-            //System.out.println(buf[nread]);
             if(buf[nread++] == terminalChar) break;        
          }
+         System.out.println("request is: "+new String(buf));
       }catch(IOException ioe){
          ioe.printStackTrace();
       }
       return (nread <=1) ? null : new String(buf, 0, nread-1);
-      /*
-      if(nread <= 1)
-         return null;
-      else
-         return new String(buf, 0, nread-1);
-      */
    }
 
    public void addRequest(Request request){
@@ -124,12 +121,6 @@ class WebInvoker implements Runnable{
    public synchronized void computePitch(Socket s){
       
    }
-/*
-   class RequestDispatcher{
-      public RequestDispatcher(){
-      }
-   }
-*/
 }
 
 
@@ -139,9 +130,11 @@ class WebInvoker implements Runnable{
  * each slave server in each 30 seconds
  */ 
 class SlaveInvoker{
-   private int checkPeriod = 500;
+   private final int CYCLING_CHECK_TIME = 3000;
+   private final int BROADCAST_TIME = 1000;
    private ServerSocket slaveService;
    private BufferedOutputStream bos;
+   private final String[] cmd = {"getSongNumber", "query"};
    private ArrayList<Request> requestList = new ArrayList<Request>();
    private ArrayList<Socket> slaveList = new ArrayList<Socket>();
    public SlaveInvoker(){
@@ -152,19 +145,39 @@ class SlaveInvoker{
       }
    }
 
-   public void broadcastMessage(String cmd){
+   public synchronized void broadcastMessage(String cmd){
       for(Socket so: slaveList){
          try{
             bos = new BufferedOutputStream(so.getOutputStream());
             bos.write(new String(cmd+"\0").getBytes());
             bos.flush();
-            bos.close();
          }catch(IOException ioe){
-            ioe.printStackTrace();
+            this.removeSlave(so);
+            break;
+            //ioe.printStackTrace();
          }
       }
    }
-   
+
+   /**
+    *  This method will dispatch the request to each slave server,
+    *  don't care about the command.
+    */
+   public synchronized void requestDispatched(Request req){
+      int range = 13000/(int)slaveList.size();
+      for(Socket so: slaveList){
+         try{
+            bos = new BufferedOutputStream(so.getOutputStream());
+            bos.write(new String(cmd+"\0").getBytes());
+            bos.flush();
+         }catch(IOException ioe){
+            this.removeSlave(so);
+            break;
+            //ioe.printStackTrace();
+         }   
+      }        
+   }
+
    /**
     * this method is used to renew the request array if there comes 
     * new request
@@ -181,11 +194,17 @@ class SlaveInvoker{
    public void cyclingCheck()throws InterruptedException, IOException{
       while(true){
          Socket slavefd = slaveService.accept();
+         System.out.println("cyclingCheck");
          this.addSlave(slavefd);
-         //Thread.sleep(checkPeriod);
+         Thread.sleep(CYCLING_CHECK_TIME);
       }
    }
    
+   /**
+    * when SlaveInvoker is started, we should try to initialize two thread,
+    * one of them is broadcast thread, it will check whether the slave server
+    * is alive or not, another one will let new slave server add.
+    */
    public void execute(){
       try{
          /* here use multithread again*/
@@ -195,8 +214,6 @@ class SlaveInvoker{
             public void run(){
                try{
                   cyclingCheck();
-                  System.out.println("cyclingCheck");
-                  Thread.sleep(1000);
                }catch(InterruptedException ie){
                   ie.printStackTrace();
                }catch(IOException ioe){
@@ -208,12 +225,14 @@ class SlaveInvoker{
          // thread2 is broadcastMessage
          Thread broadcastThread = new Thread(new Runnable(){
             public void run(){
-               try{
-                  broadcastMessage("getSongNumber");
-                  System.out.println("broadCastMessage");
-                  Thread.sleep(1000);
-               }catch(InterruptedException ie){
-                  ie.printStackTrace();
+               while(true){
+                  try{
+                     broadcastMessage("getSongNumber");
+                     System.out.println("broadCastMessage");
+                     Thread.sleep(BROADCAST_TIME);
+                  }catch(InterruptedException ie){
+                     ie.printStackTrace();
+                  }
                }
             }
          });
@@ -230,18 +249,17 @@ class SlaveInvoker{
     */
    public void addSlave(Socket s){
       slaveList.add(s);
+      System.out.println("the slaveList size is: "+slaveList.size());
    }
 
    /**
     * here just plan to delete the slave server when it
     * is lost, and just remove it
     */
-   public boolean removeSlave(int index){
-      slaveList.remove(index);
+   public boolean removeSlave(Socket s){
+      slaveList.remove(s);
+      System.out.println("the slaveList size is: "+slaveList.size());
       return true; 
    }
    
-   public void testData(){
-      //this.slaveList.add(new Socket().connect( new InetSocketAddress("127", ) ));
-   }
 }
