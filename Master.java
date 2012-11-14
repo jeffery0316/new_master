@@ -31,7 +31,7 @@ class WebInvoker implements Runnable{
    /**
     * This is default port
     */
-   private final int masterPort = 9000;
+   private final int masterPort = 8000;
    private ArrayList<Request> requestArray = new ArrayList<Request>();
    private final int BUF_SIZE = 5000;
    private Socket clifd;
@@ -103,12 +103,18 @@ class WebInvoker implements Runnable{
       }
       return (nread <=1) ? null : new String(buf, 0, nread-1);
    }
-
+   
+   /**
+    * add new request from client
+    */
    public void addRequest(Request request){
       requestArray.add(request);
       System.out.println("the queue is"+ requestArray.size());
    }
    
+   /**
+    * remove the disconnected slave server
+    */
    public boolean removeRequest(){
       if(requestArray.size()>0){
          requestArray.remove(1);
@@ -117,10 +123,9 @@ class WebInvoker implements Runnable{
          return false;
       }
    }
-
-   public synchronized void computePitch(Socket s){
-      
-   }
+   /*
+   public synchronized void computePitch(Socket s){}
+   */
 }
 
 
@@ -130,6 +135,7 @@ class WebInvoker implements Runnable{
  * each slave server in each 30 seconds
  */ 
 class SlaveInvoker{
+   private final int internal_port = 8001;
    private final int CYCLING_CHECK_TIME = 3000;
    private final int BROADCAST_TIME = 1000;
    private ServerSocket slaveService;
@@ -139,12 +145,16 @@ class SlaveInvoker{
    private ArrayList<Socket> slaveList = new ArrayList<Socket>();
    public SlaveInvoker(){
       try{
-         slaveService = new ServerSocket(9001);
+         slaveService = new ServerSocket(internal_port);
       }catch(IOException ioe){
          ioe.printStackTrace();
       }
    }
 
+   /**
+    * broadcastMessage will send the same command to every slave server,
+    * this method will use to test the slave server alive or not.
+    */
    public synchronized void broadcastMessage(String cmd){
       for(Socket so: slaveList){
          try{

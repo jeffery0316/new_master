@@ -18,8 +18,8 @@ public class TestCaseSlave{
                         
    public void go(){
       try{
-         Socket s = new Socket();//new Socket("127.0.0.1",9000);
-         InetSocketAddress isa = new InetSocketAddress("127.0.0.1", 9001);
+         Socket s = new Socket();//new Socket("127.0.0.1",8000);
+         InetSocketAddress isa = new InetSocketAddress("127.0.0.1", 8001);
          s.connect(isa, 10000);
          RecvThread recv = new RecvThread(s);
          new Thread(recv).start();
